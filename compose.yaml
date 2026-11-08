@@ -13,6 +13,8 @@ services:
   db:
     image: docker.io/library/mariadb:${MARIADB_VERSION:-11.8}
     restart: unless-stopped
+    # Let MariaDB shut down cleanly (default is 10s, then SIGKILL)
+    stop_grace_period: 60s
     environment:
       MARIADB_DATABASE: ${DB_NAME:-omeka}
       MARIADB_USER: ${DB_USER:-omeka}

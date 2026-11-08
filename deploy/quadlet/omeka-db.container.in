@@ -16,10 +16,14 @@ Environment=MARIADB_RANDOM_ROOT_PASSWORD=1
 Environment=TZ=${TZ}
 HealthCmd=healthcheck.sh --connect --innodb_initialized
 HealthInterval=10s
+# Give MariaDB time to flush and shut down cleanly (Podman's default is 10s,
+# then SIGKILL, which forces crash recovery on the next start)
+StopTimeout=60
 
 [Service]
 Restart=always
 TimeoutStartSec=300
+TimeoutStopSec=90
 
 [Install]
 WantedBy=default.target
