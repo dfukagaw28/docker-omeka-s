@@ -32,6 +32,18 @@ Caddy（ホスト）
 
 ## 手元で試す（podman compose）
 
+`podman compose` は、compose の本体（`docker-compose` または `podman-compose`）を
+呼び出すだけのコマンドなので、どちらかを別に入れておく必要があります。
+入っていないと `Error: looking up compose provider failed` になります。
+
+- **docker-compose**（動作確認済み）: Docker Compose v2 のバイナリを入れ、Podman の
+  ソケットを有効にします（下の `systemctl --user enable --now podman.socket`）。
+- **podman-compose**: `sudo apt install podman-compose`。ソケットは不要です。
+  ただし、この構成での動作はまだ確認していません。
+
+サーバーでは compose ではなく、下の「サーバーへのデプロイ（Quadlet）」を使ってください
+（compose の本体は不要です）。
+
 ```sh
 git clone git@github.com:dfukagaw28/docker-omeka-s.git
 cd docker-omeka-s
@@ -39,7 +51,7 @@ cp .env.sample .env
 chmod 600 .env
 vi .env          # DB_PASSWORD, OMEKA_ADMIN_* など
 
-systemctl --user enable --now podman.socket   # podman compose（docker-compose 経由）に必要
+systemctl --user enable --now podman.socket   # docker-compose を使う場合のみ必要
 podman compose up -d
 podman compose logs -f omeka                  # [omeka-setup] のログで進捗を確認
 ```
