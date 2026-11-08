@@ -185,6 +185,37 @@ DB のマイグレーションとモジュールのアップグレードは起�
 - compose とはボリューム名が異なります（`<COMPOSE_PROJECT_NAME>-db-data`, `-files`）。
 - マウントに付けている `:z` は SELinux 用で、Ubuntu（AppArmor）では無視されます。
 
+### ホストに MariaDB / MySQL が入っている場合（AppArmor）
+
+ホストに `mariadb-server` などが入っていると、その AppArmor プロファイル（`mariadbd`）が
+**コンテナ内の mariadbd にも適用されます**（AppArmor は実行ファイルのパスで割り当てるため）。
+このプロファイルは Podman からのシグナルを受け付けないので、DB コンテナを止めるたびに
+systemd が SIGKILL することになり、次の起動で crash recovery が走ります。
+
+症状:
+
+- DB のログに `Recovering after a crash using tc.log` が毎回出る
+- `StopSignal SIGTERM failed to stop container ... resorting to SIGKILL`
+- `podman kill --signal TERM <PREFIX>-db` が `Permission denied`
+- `ps -eo pid,label,comm | grep mariadbd` で `mariadbd (enforce)` と表示される
+  （正常なら `crun (unconfined)`）
+- `sudo journalctl -k | grep 'apparmor="DENIED"'` に `profile="mariadbd" ... peer="crun"` が出る
+
+対処（ホストの MariaDB を使っていない場合）:
+
+```sh
+sudo mariadb -e 'SHOW DATABASES;'                 # 他の用途がないか確認
+sudo mariadb-dump --all-databases > ~/host-mariadb-backup.sql && chmod 600 ~/host-mariadb-backup.sql
+sudo systemctl stop mariadb
+sudo apt purge 'mariadb-server*' 'mariadb-client*' mariadb-common && sudo apt autoremove --purge
+echo -n mariadbd | sudo tee /sys/kernel/security/apparmor/.remove   # 読み込み済みのプロファイルを外す
+systemctl --user restart omeka-db.service omeka.service
+```
+
+ホストの MariaDB を使い続ける場合は、`/etc/apparmor.d/local/` 以下のローカル設定で
+`signal (receive) peer=crun,` と `signal (receive) peer=podman,` を許可し、
+`sudo apparmor_parser -r` でプロファイルを読み込み直します（この方法は未確認）。
+
 ## Caddy
 
 `deploy/Caddyfile.sample` を参考に設定します。Omeka S は `X-Forwarded-Proto` を見て
