@@ -3,8 +3,8 @@
 Omeka S（IIIF Server などのモジュール入り）と MariaDB、必要に応じて IIPImage を
 コンテナで動かすための構成です。
 
-- テスト環境: `podman compose up -d`
-- 本番環境: Podman Quadlet（systemd 管理）
+- 手元で試す: `podman compose up -d`
+- サーバー（テスト・本番）: Podman Quadlet（systemd 管理）
 - 初回起動時に Omeka S のインストールとモジュールの有効化まで自動で行います
 - 前段にホストの Caddy を置く前提です（コンテナのポートは 127.0.0.1 にのみ公開）
 
@@ -30,7 +30,7 @@ Caddy（ホスト）
 | `deploy/Caddyfile.sample` | Caddy の設定例（basic_auth・タイル配信） |
 | `scripts/make-tiles.sh` | vips で静的タイル / ピラミッド TIFF を作成 |
 
-## テスト環境（podman compose）
+## 手元で試す（podman compose）
 
 ```sh
 git clone git@github.com:dfukagaw28/docker-omeka-s.git
@@ -53,23 +53,125 @@ IIPImage も動かす場合:
 podman compose --profile iiif up -d
 ```
 
-## 本番環境（Quadlet）
+## サーバーへのデプロイ（Quadlet）
+
+テストサーバーも本番サーバーも同じ手順で、違いは `.env` の `CONFIG_DIR` だけです
+（テスト: `./config/test`、本番: `./config/prod`）。
+以下は Ubuntu 26.04 LTS + Podman 5.7 での例です。サービスは一般ユーザー（rootless）で動かします。
+
+### 1. 準備（初回のみ）
 
 ```sh
-cp .env.sample .env && chmod 600 .env
-vi .env          # CONFIG_DIR=./config/prod, パスワード, ENABLE_IIPSRV など
-vi config/prod/mariadb.cnf config/prod/php.ini   # メモリ量に合わせる
-
-deploy/install-quadlet.sh                 # イメージをビルドし、ユニットを生成して起動
-sudo loginctl enable-linger "$USER"       # ログインしていなくても起動時に立ち上げる
-journalctl --user -u omeka.service -f
+sudo apt install podman git gettext-base caddy
+podman --version    # 5.x
 ```
+
+`caddy` が Ubuntu のリポジトリにない・古い場合は、Caddy 公式の apt リポジトリから入れます。
+
+rootless の Podman が動くことを確認します（Ubuntu は AppArmor で一般ユーザーの
+名前空間作成を制限していますが、apt で入れた Podman は許可されています）。
+
+```sh
+grep "^$USER:" /etc/subuid /etc/subgid                # 両方に行があること
+podman info --format '{{.Host.Security.Rootless}}'    # true
+podman run --rm docker.io/library/alpine echo ok
+```
+
+`/etc/subuid` / `/etc/subgid` に行がなければ追加します。
+
+```sh
+sudo usermod --add-subuids 100000-165535 --add-subgids 100000-165535 "$USER"
+```
+
+メモリが 1GB 程度のサーバーでは swap を用意します（イメージのビルド時に PHP 拡張を
+コンパイルするため）。
+
+```sh
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
+sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+ログインしていなくても、サーバー起動時にサービスが立ち上がるようにします。
+
+```sh
+sudo loginctl enable-linger "$USER"
+```
+
+ufw を有効にしている場合は 80 / 443 を開けます（コンテナのポートは 127.0.0.1 にしか
+公開しないので、それ以外は不要です）。
+
+```sh
+sudo ufw allow 80,443/tcp
+```
+
+### 2. 取得と設定
+
+```sh
+git clone https://github.com/dfukagaw28/docker-omeka-s.git ~/omeka-s
+cd ~/omeka-s
+cp .env.sample .env && chmod 600 .env
+vi .env
+```
+
+`.env` で設定する項目:
+
+- `CONFIG_DIR`: テストサーバーは `./config/test`、本番は `./config/prod`
+  （本番は `config/prod/mariadb.cnf` と `config/prod/php.ini` をメモリ量に合わせる）
+- `DB_PASSWORD`, `OMEKA_ADMIN_PASSWORD`: 英数字と `. _ @ + -` のみ
+- `OMEKA_ADMIN_EMAIL`, `OMEKA_TITLE`
+- IIPImage を使う場合: `ENABLE_IIPSRV=true`, `IIPSRV_BASE_URL=https://<ドメイン>/iiif-ptif/`
+
+### 3. デプロイ
+
+```sh
+deploy/install-quadlet.sh                 # イメージをビルドし、ユニットを生成して起動
+journalctl --user -u omeka.service -f     # 進捗を確認
+```
+
+ログに `[omeka-setup] Installed module BulkImport ...` まで出れば完了です。
+初回はイメージのビルドがあるため、1GB のサーバーでは十数分かかることがあります。
+
+`systemctl --user` / `journalctl --user` は、SSH でそのユーザーとして直接ログインしたときに
+使えます（`sudo su -` などで切り替えた場合は使えません）。
+
+### 4. Caddy
+
+`deploy/Caddyfile.sample` を `/etc/caddy/Caddyfile` にコピーし、ドメイン名と
+`basic_auth` のパスワードハッシュ（`caddy hash-password` で作成）を書き換えます。
+静的タイル（`/iiif-img/`）を使わない場合は、その部分を削除して構いません。
+
+```sh
+sudo systemctl reload caddy
+```
+
+詳しくは下の「Caddy」の節を参照してください。
+
+### 5. 確認
+
+- `https://<ドメイン>/login` で管理者としてログインできる
+- アイテムを作って画像を登録し、`https://<ドメイン>/iiif/3/<id>/manifest` の URL が https になっている
+- サーバーを再起動しても `systemctl --user status omeka.service` が active になる
+
+**最初のアクセスは必ず Caddy 経由で行ってください。** IiifServer は最初にアクセスされた
+ときの URL でマニフェストをキャッシュします（下の「Caddy」の節を参照）。
+
+### 更新
+
+```sh
+cd ~/omeka-s && git pull && deploy/install-quadlet.sh
+```
+
+DB のマイグレーションとモジュールのアップグレードは起動時に自動で実行されます。
+
+### 補足
 
 - ユニットは `~/.config/containers/systemd/` に生成されます（`--system` を付けると
   root で `/etc/containers/systemd/`）。DB パスワードを含むので権限は 600 です。
 - `.env` を変えたりバージョンを上げたりしたら、`deploy/install-quadlet.sh` を再実行します。
 - `--dry-run DIR` で、生成されるユニットだけを確認できます。
 - compose とはボリューム名が異なります（`<COMPOSE_PROJECT_NAME>-db-data`, `-files`）。
+- マウントに付けている `:z` は SELinux 用で、Ubuntu（AppArmor）では無視されます。
 
 ## Caddy
 
@@ -127,9 +229,18 @@ podman compose exec omeka sh -c 'rm -rf /var/www/html/files/iiif/*'
 
 ## データのバックアップ
 
+サーバー（Quadlet）の場合（`COMPOSE_PROJECT_NAME` が既定の `omeka-s` のとき）:
+
 ```sh
 # DB
-podman compose exec db sh -c 'mariadb-dump -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" "$MARIADB_DATABASE"' > omeka.sql
+podman exec omeka-s-db sh -c 'mariadb-dump -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" "$MARIADB_DATABASE"' > omeka.sql
 # アップロードファイル
+podman volume export omeka-s-files > omeka-files.tar
+```
+
+手元（podman compose）の場合:
+
+```sh
+podman compose exec db sh -c 'mariadb-dump -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" "$MARIADB_DATABASE"' > omeka.sql
 podman volume export omeka-s_omeka-files > omeka-files.tar
 ```
