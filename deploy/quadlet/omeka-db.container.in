@@ -1,0 +1,25 @@
+# Generated from deploy/quadlet/omeka-db.container.in by deploy/install-quadlet.sh
+[Unit]
+Description=Omeka S database (MariaDB)
+
+[Container]
+ContainerName=${PREFIX}-db
+Image=docker.io/library/mariadb:${MARIADB_VERSION}
+Network=omeka.network
+NetworkAlias=db
+Volume=omeka-db.volume:/var/lib/mysql
+Volume=${CONFIG_DIR}/mariadb.cnf:/etc/mysql/conf.d/zz-omeka.cnf:ro,z
+Environment=MARIADB_DATABASE=${DB_NAME}
+Environment=MARIADB_USER=${DB_USER}
+Environment=MARIADB_PASSWORD=${DB_PASSWORD}
+Environment=MARIADB_RANDOM_ROOT_PASSWORD=1
+Environment=TZ=${TZ}
+HealthCmd=healthcheck.sh --connect --innodb_initialized
+HealthInterval=10s
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

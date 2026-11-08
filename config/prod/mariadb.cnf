@@ -1,0 +1,8 @@
+# MariaDB settings for the production server. Adjust to the available memory:
+# innodb_buffer_pool_size is the main knob (roughly the size of the data set).
+[mysqld]
+innodb_buffer_pool_size = 1G
+max_connections         = 150
+skip-name-resolve
+character-set-server    = utf8mb4
+collation-server        = utf8mb4_unicode_ci

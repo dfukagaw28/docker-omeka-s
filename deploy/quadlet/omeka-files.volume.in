@@ -1,0 +1,3 @@
+# Generated from deploy/quadlet/omeka-files.volume.in by deploy/install-quadlet.sh
+[Volume]
+VolumeName=${PREFIX}-files

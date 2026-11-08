@@ -1,0 +1,24 @@
+# Generated from deploy/quadlet/omeka-iipsrv.container.in by deploy/install-quadlet.sh
+# Installed only when ENABLE_IIPSRV=true in .env
+[Unit]
+Description=IIPImage server for Omeka S
+
+[Container]
+ContainerName=${PREFIX}-iipsrv
+Image=docker.io/iipsrv/iipsrv:${IIPSRV_VERSION}
+Network=omeka.network
+PublishPort=127.0.0.1:${IIPSRV_PORT}:80
+Volume=${IIIF_IMAGE_DIR}:/images:ro,z
+Environment=FILESYSTEM_PREFIX=/images/
+Environment=URI_MAP=iiif=>IIIF
+Environment=VERBOSITY=1
+Environment=MAX_IMAGE_CACHE_SIZE=${IIPSRV_CACHE_MB}
+Environment=BASE_URL=${IIPSRV_BASE_URL}
+Environment=CORS=*
+StopTimeout=3
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,75 @@
+# Omeka S + MariaDB (+ optional IIPImage) for Podman / Docker Compose.
+#
+#   cp .env.sample .env && vi .env
+#   podman compose up -d                    # Omeka S + DB
+#   podman compose --profile iiif up -d     # + IIPImage server
+#
+# Ports are published on 127.0.0.1 only; put a reverse proxy (Caddy) in front.
+# For production with systemd, see deploy/quadlet/.
+
+name: ${COMPOSE_PROJECT_NAME:-omeka-s}
+
+services:
+  db:
+    image: docker.io/library/mariadb:${MARIADB_VERSION:-11.8}
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-omeka}
+      MARIADB_USER: ${DB_USER:-omeka}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      MARIADB_RANDOM_ROOT_PASSWORD: "1"
+      TZ: ${TZ:-Asia/Tokyo}
+    volumes:
+      - db-data:/var/lib/mysql
+      - ${CONFIG_DIR:-./config/test}/mariadb.cnf:/etc/mysql/conf.d/zz-omeka.cnf:ro,z
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 10
+
+  omeka:
+    build:
+      context: ./omeka
+      args:
+        PHP_VERSION: ${PHP_VERSION:-8.5}
+        OMEKA_VERSION: ${OMEKA_VERSION:-4.2.1}
+    image: localhost/omeka-s:${OMEKA_VERSION:-4.2.1}-php${PHP_VERSION:-8.5}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+    ports:
+      - "127.0.0.1:${OMEKA_PORT:-8001}:80"
+    volumes:
+      - omeka-files:/var/www/html/files
+      - ${CONFIG_DIR:-./config/test}/php.ini:/usr/local/etc/php/conf.d/zz-env.ini:ro,z
+
+  iipsrv:
+    profiles: ["iiif"]
+    image: docker.io/iipsrv/iipsrv:${IIPSRV_VERSION:-latest}
+    # its start script does not forward SIGTERM, so do not wait long
+    stop_grace_period: 3s
+    restart: unless-stopped
+    environment:
+      # Images are looked up under /images/; IIIF URLs are /iiif/<file>/...
+      FILESYSTEM_PREFIX: /images/
+      URI_MAP: "iiif=>IIIF"
+      VERBOSITY: ${IIPSRV_VERBOSITY:-1}
+      MAX_IMAGE_CACHE_SIZE: ${IIPSRV_CACHE_MB:-10}
+      # Public URL prefix used for "id" in info.json (empty: derived from Host)
+      BASE_URL: ${IIPSRV_BASE_URL:-}
+      CORS: "*"
+    ports:
+      - "127.0.0.1:${IIPSRV_PORT:-8002}:80"
+    volumes:
+      - ${IIIF_IMAGE_DIR:-./data/ptif}:/images:ro,z
+
+volumes:
+  db-data:
+  omeka-files:

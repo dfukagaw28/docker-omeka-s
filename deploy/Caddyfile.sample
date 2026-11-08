@@ -1,0 +1,42 @@
+# Caddy (on the host) in front of the Omeka S containers.
+# Copy into /etc/caddy/Caddyfile (or import it) and replace the domain,
+# ports, paths and the password hash.
+#
+# Create a password hash with:  caddy hash-password
+
+omeka.example.org {
+	encode zstd gzip
+
+	# Restrict the whole site until the publication terms are settled.
+	# Note: Omeka's "private" setting does not protect files under /files/,
+	# nor the image endpoints below -- anyone with the URL can fetch them.
+	# Remove this block (or narrow it) once the site may be public.
+	basic_auth {
+		viewer $2a$14$REPLACE_WITH_OUTPUT_OF_caddy_hash-password
+	}
+	# Alternatively restrict by IP address:
+	# @blocked not remote_ip 192.0.2.0/24 2001:db8::/32
+	# respond @blocked 403
+
+	# (2) Static IIIF Level 0 tiles made by scripts/make-tiles.sh static
+	handle_path /iiif-img/* {
+		root * /srv/iiif-img
+		header Access-Control-Allow-Origin *
+		file_server
+	}
+
+	# (3) IIPImage server (compose profile "iiif"); set IIPSRV_BASE_URL to
+	#     https://omeka.example.org/iiif-ptif/ in .env
+	handle_path /iiif-ptif/* {
+		rewrite * /iiif{uri}
+		reverse_proxy 127.0.0.1:8002
+	}
+
+	# Omeka S
+	handle {
+		request_body {
+			max_size 512MB
+		}
+		reverse_proxy 127.0.0.1:8001
+	}
+}

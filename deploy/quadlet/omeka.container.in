@@ -1,0 +1,23 @@
+# Generated from deploy/quadlet/omeka.container.in by deploy/install-quadlet.sh
+[Unit]
+Description=Omeka S
+Requires=omeka-db.service
+After=omeka-db.service
+
+[Container]
+ContainerName=${PREFIX}-app
+Image=localhost/omeka-s:${OMEKA_VERSION}-php${PHP_VERSION}
+Network=omeka.network
+EnvironmentFile=${REPO_DIR}/.env
+Environment=DB_HOST=db
+PublishPort=127.0.0.1:${OMEKA_PORT}:80
+Volume=omeka-files.volume:/var/www/html/files
+Volume=${CONFIG_DIR}/php.ini:/usr/local/etc/php/conf.d/zz-env.ini:ro,z
+
+[Service]
+Restart=always
+# First start installs Omeka S and its modules
+TimeoutStartSec=600
+
+[Install]
+WantedBy=default.target

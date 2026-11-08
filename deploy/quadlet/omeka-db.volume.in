@@ -1,0 +1,3 @@
+# Generated from deploy/quadlet/omeka-db.volume.in by deploy/install-quadlet.sh
+[Volume]
+VolumeName=${PREFIX}-db-data

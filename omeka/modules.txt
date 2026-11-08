@@ -1,0 +1,17 @@
+# Omeka S modules bundled into the image.
+# Format: <Name> <Version> [<zip URL>]
+# If the URL is omitted, the Daniel-KM release URL is used:
+#   https://github.com/Daniel-KM/Omeka-S-module-<Name>/releases/download/<Version>/<Name>-<Version>.zip
+#
+# Modules are installed/activated on first start in the order listed here,
+# so dependencies (Common, Log) must come first.
+# To add a module that should be present but NOT activated automatically,
+# prefix its name with "!" (e.g. "!BulkImport 3.4.67").
+
+Common      3.4.95
+Log         3.4.43
+IiifServer  3.6.35
+Mirador     3.4.17
+CleanUrl    3.17.17
+Mapper      3.4.10
+BulkImport  3.4.67
