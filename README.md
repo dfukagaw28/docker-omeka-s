@@ -194,6 +194,27 @@ https の URL を生成するので、IIIF マニフェストの URL も https �
 IIIF 画像の URL は、URL が分かれば誰でも取得できます。公開してよいと確認できるまでは、
 サイト全体に `basic_auth`（または IP 制限）をかけてください（サンプルに記載）。
 
+**Basic 認証:** サンプルでは `basic_auth` をサイトブロックの直下に置いているので、
+Omeka・`/files/`・`/iiif-img/`・`/iiif-ptif/` のすべてにかかります。
+
+```sh
+caddy hash-password                  # パスワードを入力すると $2a$14$... が出力される
+sudoedit /etc/caddy/Caddyfile        # viewer の後ろのハッシュを置き換える
+caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+```
+
+- ユーザーを増やすときは、`basic_auth { ... }` の中に `ユーザー名 ハッシュ` の行を足します。
+- サンプルのハッシュ（`REPLACE_WITH_...`）のままでも `caddy validate` は通りますが、
+  誰もログインできません。必ず置き換えてください。
+- Omeka のログインとは別です。管理画面に入るには、両方を通ります。
+- Omeka 内の Mirador など、同じサイト上のビューアは問題なく動きます
+  （ブラウザが認証情報を自動で付けます）。
+- 他サイトの IIIF ビューアからは読めません。ブラウザは CORS のプリフライト（OPTIONS）に
+  認証情報を付けないため、401 になります。外部に公開する段階で `basic_auth` を外すか、
+  IIIF 部分（`/iiif/*`, `/files/*`, `/iiif-img/*`, `/iiif-ptif/*`）を認証の対象外にします。
+  対象外にした部分は、URL が分かれば誰でも取得できます。
+
 **IIIF マニフェストのキャッシュ:** IiifServer モジュールはマニフェストを
 `files/iiif/` にキャッシュします。最初のアクセス時の URL（ホスト名・スキーム）が
 保存されるので、公開ドメインを変えたときや、Caddy を通さずにアクセスしてしまったときは
