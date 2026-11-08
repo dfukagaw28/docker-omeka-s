@@ -10,6 +10,7 @@
 #   make-tiles.sh ptif <out-dir> <image>...
 #       Pyramidal TIFFs for the IIPImage server (compose profile "iiif").
 #       Put them in IIIF_IMAGE_DIR; served as /iiif/<name>.tif/info.json
+#       (made world-readable: the server runs as www-data in the container)
 #
 # <name> is the input file name without its extension.
 # Register the resulting info.json URL in Omeka S as an "IIIF image" media.
@@ -23,7 +24,7 @@ TILE_SIZE="${TILE_SIZE:-512}"
 QUALITY="${QUALITY:-90}"
 
 usage() {
-    sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//' >&2
+    sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' >&2
     exit 2
 }
 
@@ -55,7 +56,10 @@ case "$mode" in
             vips tiffsave "$src" "$out_dir/$name.tif" \
                 --tile --pyramid --tile-width 256 --tile-height 256 \
                 --compression jpeg --Q "$QUALITY"
+            # The IIPImage container reads files as www-data
+            chmod a+r "$out_dir/$name.tif"
         done
+        chmod a+rx "$out_dir"
         ;;
     *) usage ;;
 esac

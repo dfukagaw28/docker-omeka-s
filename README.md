@@ -99,7 +99,9 @@ podman compose exec omeka sh -c 'rm -rf /var/www/html/files/iiif/*'
    # → tiles/image/info.json を /srv/iiif-img/ に置き、
    #   Omeka で「IIIF image」メディアとして https://omeka.example.org/iiif-img/image/info.json を登録
    ```
-3. **IIPImage**: ピラミッド TIFF を `IIIF_IMAGE_DIR` に置きます。
+3. **IIPImage**（[`ghcr.io/dfukagaw28/iipsrv`](https://github.com/dfukagaw28/docker-iipsrv)）:
+   ピラミッド TIFF を `IIIF_IMAGE_DIR` に置きます。コンテナ内では www-data（uid 33）が読むので、
+   ファイルは誰でも読める権限（644、ディレクトリは 755）にしてください（`make-tiles.sh` はそうします）。
    ```sh
    scripts/make-tiles.sh ptif ./data/ptif image.tif
    # → https://omeka.example.org/iiif-ptif/image.tif/info.json

@@ -52,23 +52,19 @@ services:
 
   iipsrv:
     profiles: ["iiif"]
-    image: docker.io/iipsrv/iipsrv:${IIPSRV_VERSION:-latest}
-    # its start script does not forward SIGTERM, so do not wait long
-    stop_grace_period: 3s
+    # https://github.com/dfukagaw28/docker-iipsrv
+    # IIIF URLs are /iiif/<file>/...; other settings: see its README.
+    image: ghcr.io/dfukagaw28/iipsrv:${IIPSRV_VERSION:-1.3}
     restart: unless-stopped
     environment:
-      # Images are looked up under /images/; IIIF URLs are /iiif/<file>/...
-      FILESYSTEM_PREFIX: /images/
-      URI_MAP: "iiif=>IIIF"
-      VERBOSITY: ${IIPSRV_VERBOSITY:-1}
       MAX_IMAGE_CACHE_SIZE: ${IIPSRV_CACHE_MB:-10}
       # Public URL prefix used for "id" in info.json (empty: derived from Host)
       BASE_URL: ${IIPSRV_BASE_URL:-}
-      CORS: "*"
     ports:
       - "127.0.0.1:${IIPSRV_PORT:-8002}:80"
     volumes:
-      - ${IIIF_IMAGE_DIR:-./data/ptif}:/images:ro,z
+      # Files must be readable by www-data (uid 33) in the container
+      - ${IIIF_IMAGE_DIR:-./data/ptif}:/data/images:ro,z
 
 volumes:
   db-data:
