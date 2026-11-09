@@ -1,0 +1,65 @@
+# nginx (on the host) in front of the Omeka S containers; the same setup as
+# Caddyfile.sample. Copy to /etc/nginx/sites-available/omeka, link it from
+# sites-enabled, and replace the domain, ports and paths.
+#
+# Certificate (Let's Encrypt):  sudo certbot certonly --nginx -d omeka.example.org
+# Password file (Basic auth):   sudo htpasswd -c /etc/nginx/omeka.htpasswd viewer
+# Check and reload:             sudo nginx -t && sudo systemctl reload nginx
+
+server {
+	listen 80;
+	listen [::]:80;
+	server_name omeka.example.org;
+	return 301 https://$host$request_uri;
+}
+
+server {
+	listen 443 ssl;
+	listen [::]:443 ssl;
+	http2 on;
+	server_name omeka.example.org;
+
+	ssl_certificate     /etc/letsencrypt/live/omeka.example.org/fullchain.pem;
+	ssl_certificate_key /etc/letsencrypt/live/omeka.example.org/privkey.pem;
+
+	gzip on;
+	gzip_types text/css application/javascript application/json application/ld+json image/svg+xml;
+
+	# Restrict the whole site until the publication terms are settled.
+	# Note: Omeka's "private" setting does not protect files under /files/,
+	# nor the image endpoints below -- anyone with the URL can fetch them.
+	# Remove these lines (or move them into locations) once the site may be public.
+	auth_basic "Omeka S";
+	auth_basic_user_file /etc/nginx/omeka.htpasswd;
+	# Alternatively restrict by IP address:
+	# allow 192.0.2.0/24;
+	# allow 2001:db8::/32;
+	# deny all;
+
+	proxy_set_header Host              $host;
+	proxy_set_header X-Real-IP         $remote_addr;
+	proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+	proxy_set_header X-Forwarded-Proto $scheme;
+	proxy_set_header X-Forwarded-Host  $host;
+
+	# (2) Static IIIF Level 0 tiles made by scripts/make-tiles.sh static
+	location /iiif-img/ {
+		alias /srv/iiif-img/;
+		add_header Access-Control-Allow-Origin * always;
+	}
+
+	# (3) IIPImage server; set IIPSRV_BASE_URL to https://omeka.example.org/iiif-ptif/
+	#     in .env. The container serves IIIF at /iiif/ and adds the CORS header itself.
+	location /iiif-ptif/ {
+		proxy_pass http://127.0.0.1:8002/iiif/;
+		proxy_read_timeout 300s;
+	}
+
+	# Omeka S
+	location / {
+		client_max_body_size 512m;
+		proxy_pass http://127.0.0.1:8001;
+		proxy_read_timeout 300s;
+		proxy_send_timeout 300s;
+	}
+}

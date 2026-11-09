@@ -6,7 +6,7 @@ Omeka S（IIIF Server などのモジュール入り）と MariaDB、必要に�
 - 手元で試す: `podman compose up -d`
 - サーバー（テスト・本番）: Podman Quadlet（systemd 管理）
 - 初回起動時に Omeka S のインストールとモジュールの有効化まで自動で行います
-- 前段にホストの Caddy を置く前提です（コンテナのポートは 127.0.0.1 にのみ公開）
+- 前段にホストの Caddy（または nginx）を置く前提です（コンテナのポートは 127.0.0.1 にのみ公開）
 
 ```
 Caddy（ホスト）
@@ -28,6 +28,7 @@ Caddy（ホスト）
 | `deploy/quadlet/` | 本番用 Quadlet ユニットのテンプレート |
 | `deploy/install-quadlet.sh` | `.env` からユニットを生成してサービスを起動 |
 | `deploy/Caddyfile.sample` | Caddy の設定例（basic_auth・タイル配信） |
+| `deploy/nginx.conf.sample` | nginx の設定例（Caddy と同じ構成） |
 | `scripts/make-tiles.sh` | vips で静的タイル / ピラミッド TIFF を作成 |
 
 ## 手元で試す（podman compose）
@@ -159,7 +160,7 @@ journalctl --user -u omeka.service -f     # 進捗を確認
 sudo systemctl reload caddy
 ```
 
-詳しくは下の「Caddy」の節を参照してください。
+詳しくは下の「Caddy」の節を参照してください。nginx を使う場合は、下の「nginx」の節を参照してください。
 
 ### 5. 確認
 
@@ -257,6 +258,26 @@ sudo systemctl reload caddy
 podman exec omeka-s-app sh -c 'rm -rf /var/www/html/files/iiif/*'         # Quadlet
 podman compose exec omeka sh -c 'rm -rf /var/www/html/files/iiif/*'      # compose
 ```
+
+## nginx
+
+Caddy の代わりに nginx を使う場合は `deploy/nginx.conf.sample` を使います。構成は Caddy と同じで、
+Basic 認証・CORS・マニフェストのキャッシュの注意も上の「Caddy」の節と同じです。
+
+```sh
+sudo apt install nginx certbot python3-certbot-nginx apache2-utils
+sudo cp deploy/nginx.conf.sample /etc/nginx/sites-available/omeka
+sudoedit /etc/nginx/sites-available/omeka      # ドメイン名・ポート・パスを書き換える
+sudo certbot certonly --nginx -d <ドメイン>      # 証明書（/etc/letsencrypt/live/<ドメイン>/）
+sudo ln -s /etc/nginx/sites-available/omeka /etc/nginx/sites-enabled/
+sudo htpasswd -c /etc/nginx/omeka.htpasswd viewer   # Basic 認証のユーザー（2 人目からは -c なし）
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+- `/iiif-ptif/` は IIPImage コンテナの `/iiif/` に転送します。CORS のヘッダーは IIPImage が付けます。
+- 証明書は、このサイトを有効にする（`sites-enabled` にリンクする）前に取ってください。
+  証明書のファイルがないと `nginx -t` が通らず、certbot も nginx を使えません。
+- 既定のサイト（`sites-enabled/default`）は、証明書を取ったあとに外して構いません。
 
 ## IIIF 画像の配信方式
 
