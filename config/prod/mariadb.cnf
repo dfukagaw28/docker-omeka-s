@@ -1,7 +1,9 @@
-# MariaDB settings for the production server. Adjust to the available memory:
-# innodb_buffer_pool_size is the main knob (roughly the size of the data set).
+# MariaDB settings for the production server (plenty of memory).
+# innodb_buffer_pool_size is the main knob: make it larger than the data set
+# (see README for how to check its size). Smaller servers, e.g. about 2 GB of
+# RAM for Omeka: 512M.
 [mysqld]
-innodb_buffer_pool_size = 1G
+innodb_buffer_pool_size = 4G
 max_connections         = 150
 skip-name-resolve
 character-set-server    = utf8mb4

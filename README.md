@@ -129,7 +129,9 @@ vi .env
 `.env` で設定する項目:
 
 - `CONFIG_DIR`: テストサーバーは `./config/test`、本番は `./config/prod`
-  （本番は `config/prod/mariadb.cnf` と `config/prod/php.ini` をメモリ量に合わせる）
+  （`config/prod/` はメモリに余裕のあるサーバー向け: DB のバッファ 4G、PHP の
+  `memory_limit` 2G。Omeka に回せるメモリが 2GB 程度なら、両方を 512M に下げる）
+- 本番では ImageMagick の上限も広げる: `MAGICK_MEMORY_LIMIT=4GiB`, `MAGICK_MAP_LIMIT=8GiB`
 - `DB_PASSWORD`, `OMEKA_ADMIN_PASSWORD`: 英数字と `. _ @ + -` のみ
 - `OMEKA_ADMIN_EMAIL`, `OMEKA_TITLE`
 - IIPImage を使う場合: `ENABLE_IIPSRV=true`, `IIPSRV_BASE_URL=https://<ドメイン>/iiif-ptif/`
@@ -299,6 +301,12 @@ podman compose exec omeka sh -c 'rm -rf /var/www/html/files/iiif/*'      # compo
 更新後に再ビルドして起動すると、コアの DB マイグレーションとモジュールのアップグレードが
 自動で実行されます（`podman compose up -d --build` または `deploy/install-quadlet.sh`）。
 管理画面で無効化したモジュールは、自動で有効に戻しません。
+
+DB の大きさは次のコマンドで確かめられます（`innodb_buffer_pool_size` はこれより大きくする）。
+
+```sh
+podman exec omeka-s-db sh -c 'mariadb -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" -e "SELECT ROUND(SUM(data_length+index_length)/1024/1024) AS MB FROM information_schema.tables WHERE table_schema=\"$MARIADB_DATABASE\""'
+```
 
 ## データのバックアップ
 
