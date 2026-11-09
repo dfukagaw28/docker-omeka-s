@@ -1,0 +1,63 @@
+# nginx: Omeka S under a sub-path (here /omeka) of a site nginx already serves.
+# Unlike nginx.conf.sample this is not a server of its own: copy it to
+# /etc/nginx/snippets/omeka.conf and include it in the existing https server:
+#
+#     server {
+#         listen 443 ssl;
+#         server_name example.org;
+#         ...
+#         include snippets/omeka.conf;
+#     }
+#
+# In .env set OMEKA_BASE_PATH=/omeka and, for IIPImage,
+# IIPSRV_BASE_URL=https://example.org/omeka/iiif-ptif/ (then run
+# deploy/install-quadlet.sh again). To use another name than /omeka, change
+# every /omeka below and OMEKA_BASE_PATH together.
+#
+# Password file (Basic auth):  sudo htpasswd -c /etc/nginx/omeka.htpasswd viewer
+# Check and reload:            sudo nginx -t && sudo systemctl reload nginx
+
+location = /omeka {
+	return 301 /omeka/;
+}
+
+# ^~: regex locations of the existing site (e.g. ~* \.(css|js|png)$) must not
+# take requests under /omeka/
+location ^~ /omeka/ {
+	# Restrict Omeka and its images until the publication terms are settled.
+	# Note: Omeka's "private" setting does not protect files under /files/,
+	# nor the image endpoints below -- anyone with the URL can fetch them.
+	# The nested locations below inherit this.
+	auth_basic "Omeka S";
+	auth_basic_user_file /etc/nginx/omeka.htpasswd;
+	# Alternatively restrict by IP address:
+	# allow 192.0.2.0/24;
+	# deny all;
+
+	proxy_set_header Host              $http_host;
+	proxy_set_header X-Real-IP         $remote_addr;
+	proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+	proxy_set_header X-Forwarded-Proto $scheme;
+	proxy_set_header X-Forwarded-Host  $http_host;
+	# Omeka's .htaccess redirects (e.g. trailing slashes) with http://
+	proxy_redirect http://$http_host/ https://$http_host/;
+
+	# Omeka S. No URI after the port: the request keeps its /omeka/ prefix,
+	# which the container serves when OMEKA_BASE_PATH=/omeka.
+	client_max_body_size 512m;
+	proxy_read_timeout 300s;
+	proxy_send_timeout 300s;
+	proxy_pass http://127.0.0.1:8001;
+
+	# IIPImage server: /omeka/iiif-ptif/<file>.tif/... -> the container's /iiif/
+	# (it adds the CORS header itself)
+	location ^~ /omeka/iiif-ptif/ {
+		proxy_pass http://127.0.0.1:8002/iiif/;
+	}
+
+	# Static IIIF Level 0 tiles made by scripts/make-tiles.sh static
+	# location ^~ /omeka/iiif-img/ {
+	# 	alias /srv/iiif-img/;
+	# 	add_header Access-Control-Allow-Origin * always;
+	# }
+}

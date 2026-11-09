@@ -36,11 +36,13 @@ server {
 	# allow 2001:db8::/32;
 	# deny all;
 
-	proxy_set_header Host              $host;
+	proxy_set_header Host              $http_host;
 	proxy_set_header X-Real-IP         $remote_addr;
 	proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
 	proxy_set_header X-Forwarded-Proto $scheme;
-	proxy_set_header X-Forwarded-Host  $host;
+	proxy_set_header X-Forwarded-Host  $http_host;
+	# Omeka's .htaccess redirects (e.g. trailing slashes) with http://
+	proxy_redirect http://$http_host/ https://$http_host/;
 
 	# (2) Static IIIF Level 0 tiles made by scripts/make-tiles.sh static
 	location /iiif-img/ {

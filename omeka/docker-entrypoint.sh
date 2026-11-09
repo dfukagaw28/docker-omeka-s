@@ -46,6 +46,27 @@ EOF
 chown www-data:www-data "$OMEKA_DIR/config/database.ini"
 chmod 600 "$OMEKA_DIR/config/database.ini"
 
+# Serve Omeka under a sub-path as well (e.g. /omeka), for a proxy that keeps
+# the prefix. Omeka's .htaccess handles Apache aliases, and builds its URLs
+# (including IIIF manifests) from the request path.
+BASE_PATH="${OMEKA_BASE_PATH:-}"
+BASE_PATH="${BASE_PATH%/}"
+BASE_CONF=/etc/apache2/conf-enabled/omeka-base-path.conf
+if [ -n "$BASE_PATH" ]; then
+    case "$BASE_PATH" in
+        /*/*|*[!A-Za-z0-9/._-]*|/.|/..|[!/]*)
+            echo "omeka-entrypoint: OMEKA_BASE_PATH must be one path segment like /omeka (got '$OMEKA_BASE_PATH')" >&2
+            exit 1 ;;
+    esac
+    if [ -e "$OMEKA_DIR$BASE_PATH" ]; then
+        echo "omeka-entrypoint: OMEKA_BASE_PATH $BASE_PATH is a folder of Omeka; choose another name" >&2
+        exit 1
+    fi
+    echo "Alias $BASE_PATH $OMEKA_DIR" > "$BASE_CONF"
+else
+    rm -f "$BASE_CONF"
+fi
+
 # A freshly created volume (or a bind mount) may not be owned by www-data.
 if [ "$(stat -c %U "$OMEKA_DIR/files")" != "www-data" ]; then
     chown www-data:www-data "$OMEKA_DIR/files"

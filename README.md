@@ -279,6 +279,29 @@ sudo nginx -t && sudo systemctl reload nginx
   証明書のファイルがないと `nginx -t` が通らず、certbot も nginx を使えません。
 - 既定のサイト（`sites-enabled/default`）は、証明書を取ったあとに外して構いません。
 
+### 既存のサイトのサブディレクトリに置く
+
+nginx がすでに別のサイトを配信していて、Omeka をその下（例: `https://example.org/omeka/`）に
+置く場合は、`deploy/nginx-subdir.conf.sample` を既存の `server` ブロックに `include` します。
+新しい `server` は作らないので、既存のサイトの設定や証明書とは衝突しません。
+
+1. `.env` に `OMEKA_BASE_PATH=/omeka` と `IIPSRV_BASE_URL=https://example.org/omeka/iiif-ptif/` を書き、
+   `deploy/install-quadlet.sh` を実行し直す（コンテナの Apache が `/omeka/` でも Omeka を返すようになる）
+2. nginx に部品を入れる
+   ```sh
+   sudo cp deploy/nginx-subdir.conf.sample /etc/nginx/snippets/omeka.conf
+   sudoedit /etc/nginx/sites-available/<既存のサイト>   # https の server { } の中に include snippets/omeka.conf; を足す
+   sudo htpasswd -c /etc/nginx/omeka.htpasswd viewer
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+
+- `/omeka` 以外の名前にするときは、`OMEKA_BASE_PATH` と部品の中の `/omeka` をすべて同じ名前にします。
+  名前は 1 階層だけで、Omeka のフォルダ名（`files`、`modules` など）は使えません。
+- Basic 認証は `/omeka/` の下（Omeka と IIIF）だけにかかり、既存のサイトには影響しません。
+- 部品は `location ^~ /omeka/` なので、既存のサイトの正規表現の `location`（`~* \.(css|js)$` など）より
+  優先されます。既存のサイトに `location /omeka/` がすでにあると `nginx -t` がエラーになります。
+- 先に `/` でアクセスしていた場合は、マニフェストのキャッシュ（上の「Caddy」の節）を削除してください。
+
 ## IIIF 画像の配信方式
 
 1. **画像サーバーなし（既定）**: IIIF Server が Omeka の画像（original / large）を
