@@ -51,7 +51,7 @@ done < "$REPO_DIR/.env"
 : "${OMEKA_PORT:=8001}" "${IIPSRV_PORT:=8002}"
 : "${DB_NAME:=omeka}" "${DB_USER:=omeka}"
 : "${IIIF_IMAGE_DIR:=./data/ptif}" "${IIPSRV_BASE_URL:=}" "${IIPSRV_CACHE_MB:=10}"
-: "${ENABLE_IIPSRV:=false}"
+: "${ENABLE_IIPSRV:=false}" "${OMEKA_PUBLIC_HOSTS:=}"
 [ -n "${DB_PASSWORD:-}" ] || die "DB_PASSWORD is not set in .env"
 
 # Values end up in systemd unit files, where % and $ have special meaning.
@@ -66,8 +66,17 @@ CONFIG_DIR="$(abspath "$CONFIG_DIR")"
 IIIF_IMAGE_DIR="$(abspath "$IIIF_IMAGE_DIR")"
 [ -f "$CONFIG_DIR/mariadb.cnf" ] || die "$CONFIG_DIR/mariadb.cnf not found"
 PREFIX="$COMPOSE_PROJECT_NAME"
+# Names of this server that Omeka fetches (e.g. the host of IIPSRV_BASE_URL): a
+# rootless container cannot connect to the host's own public address, so point
+# them at the host (host-gateway) inside the Omeka container.
+OMEKA_ADD_HOSTS=
+for name in $(echo "$OMEKA_PUBLIC_HOSTS" | tr ',' ' '); do
+    case "$name" in *[!A-Za-z0-9.-]*|.*|-*) die "invalid name in OMEKA_PUBLIC_HOSTS: $name" ;; esac
+    OMEKA_ADD_HOSTS="${OMEKA_ADD_HOSTS}AddHost=$name:host-gateway
+"
+done
 export REPO_DIR CONFIG_DIR IIIF_IMAGE_DIR PREFIX TZ OMEKA_VERSION PHP_VERSION MARIADB_VERSION \
-    IIPSRV_VERSION OMEKA_PORT IIPSRV_PORT DB_NAME DB_USER IIPSRV_BASE_URL IIPSRV_CACHE_MB
+    IIPSRV_VERSION OMEKA_PORT IIPSRV_PORT DB_NAME DB_USER IIPSRV_BASE_URL IIPSRV_CACHE_MB OMEKA_ADD_HOSTS
 
 if [ "$DRY_RUN" = false ]; then
     echo "==> Building localhost/omeka-s:$OMEKA_VERSION-php$PHP_VERSION (PHP $PHP_VERSION)"
@@ -79,7 +88,7 @@ fi
 
 echo "==> Writing units to $UNIT_DIR"
 mkdir -p "$UNIT_DIR"
-VARS='$PREFIX $REPO_DIR $CONFIG_DIR $TZ $OMEKA_VERSION $PHP_VERSION $MARIADB_VERSION $IIPSRV_VERSION $OMEKA_PORT $IIPSRV_PORT $DB_NAME $DB_USER $DB_PASSWORD $IIIF_IMAGE_DIR $IIPSRV_BASE_URL $IIPSRV_CACHE_MB'
+VARS='$PREFIX $REPO_DIR $CONFIG_DIR $TZ $OMEKA_VERSION $PHP_VERSION $MARIADB_VERSION $IIPSRV_VERSION $OMEKA_PORT $IIPSRV_PORT $DB_NAME $DB_USER $DB_PASSWORD $IIIF_IMAGE_DIR $IIPSRV_BASE_URL $IIPSRV_CACHE_MB $OMEKA_ADD_HOSTS'
 services="omeka-db.service omeka.service"
 for template in "$TEMPLATE_DIR"/*.in; do
     unit="$(basename "$template" .in)"

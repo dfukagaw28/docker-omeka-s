@@ -33,6 +33,12 @@ location ^~ /omeka/ {
 	# Alternatively restrict by IP address:
 	# allow 192.0.2.0/24;
 	# deny all;
+	# Omeka fetches its own IIIF images (info.json, full/max) when importing them.
+	# With OMEKA_PUBLIC_HOSTS in .env those requests come from the server's own
+	# public address; let it in without the password:
+	# satisfy any;
+	# allow 203.0.113.10;   # this server's public address
+	# deny all;
 
 	proxy_set_header Host              $http_host;
 	proxy_set_header X-Real-IP         $remote_addr;

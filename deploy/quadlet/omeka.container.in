@@ -13,7 +13,8 @@ Environment=DB_HOST=db
 PublishPort=127.0.0.1:${OMEKA_PORT}:80
 Volume=omeka-files.volume:/var/www/html/files
 Volume=${CONFIG_DIR}/php.ini:/usr/local/etc/php/conf.d/zz-env.ini:ro,z
-
+# OMEKA_PUBLIC_HOSTS in .env
+${OMEKA_ADD_HOSTS}
 [Service]
 Restart=always
 # First start installs Omeka S and its modules

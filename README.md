@@ -302,6 +302,22 @@ nginx がすでに別のサイトを配信していて、Omeka をその下（�
   優先されます。既存のサイトに `location /omeka/` がすでにあると `nginx -t` がエラーになります。
 - 先に `/` でアクセスしていた場合は、マニフェストのキャッシュ（上の「Caddy」の節）を削除してください。
 
+### Omeka からサーバー自身の URL を取得する（IIIF 画像の取り込み）
+
+Omeka は IIIF 画像を取り込むときに、`info.json` とサムネイル用の画像を公開 URL から取得します。
+rootless の Podman のコンテナからはホスト自身の公開アドレスに接続できない
+（`curl: (7) ... Could not connect to server`）ので、次のようにします。
+
+1. `.env` の `OMEKA_PUBLIC_HOSTS` にサーバーの名前（`IIPSRV_BASE_URL` のホスト名）を書き、
+   `deploy/install-quadlet.sh` を実行し直す。Omeka のコンテナの中だけで、その名前がホスト（`host-gateway`）を指す（Podman 5.3 以降）
+2. Basic 認証をかけている場合は、部品の `satisfy any;`・`allow <サーバーの公開アドレス>;`・`deny all;` を有効にする
+   （コンテナからの接続は、nginx からはサーバーの公開アドレスに見える）
+3. 確かめる
+   ```sh
+   podman exec omeka-s-app curl -sS -o /dev/null -w '%{http_code}\n' https://<ドメイン>/omeka/iiif-ptif/<ファイル>.tif/info.json
+   ```
+   200 なら取り込める
+
 ## IIIF 画像の配信方式
 
 1. **画像サーバーなし（既定）**: IIIF Server が Omeka の画像（original / large）を
