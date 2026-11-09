@@ -29,6 +29,7 @@ Caddy（ホスト）
 | `deploy/install-quadlet.sh` | `.env` からユニットを生成してサービスを起動 |
 | `deploy/Caddyfile.sample` | Caddy の設定例（basic_auth・タイル配信） |
 | `scripts/make-tiles.sh` | vips で静的タイル / ピラミッド TIFF を作成 |
+| `scripts/survey-images.py` | 画像群の構成を、名前を出さずに集計（件数・形式・大きさ・PSD のレイヤー） |
 
 ## 手元で試す（podman compose）
 
