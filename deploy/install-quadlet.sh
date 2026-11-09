@@ -88,7 +88,13 @@ for template in "$TEMPLATE_DIR"/*.in; do
             rm -f "$UNIT_DIR/$unit"
             continue
         fi
-        [ "$DRY_RUN" = true ] || mkdir -p "$IIIF_IMAGE_DIR"
+        if [ "$DRY_RUN" = false ] && [ ! -d "$IIIF_IMAGE_DIR" ]; then
+            mkdir -p "$IIIF_IMAGE_DIR" 2>/dev/null || die "IIIF_IMAGE_DIR $IIIF_IMAGE_DIR does not exist and cannot be created by $(id -un); create it, or check that every parent folder is accessible (namei -l $IIIF_IMAGE_DIR)"
+        fi
+        # The container reads the images as www-data, i.e. as "other" users
+        if [ "$DRY_RUN" = false ] && ! ls "$IIIF_IMAGE_DIR" >/dev/null 2>&1; then
+            die "cannot read IIIF_IMAGE_DIR $IIIF_IMAGE_DIR as $(id -un) (check: namei -l $IIIF_IMAGE_DIR)"
+        fi
         services="$services omeka-iipsrv.service"
     fi
     (umask 077; envsubst "$VARS" < "$template" > "$UNIT_DIR/$unit")
