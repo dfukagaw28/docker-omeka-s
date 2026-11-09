@@ -17,6 +17,7 @@ collection itself is confidential:
     psd-tools: uv run --with psd-tools python3 scripts/survey-images.py ...)
 
 Nothing is written; files are only read (headers, and whole PSDs with --psd).
+Progress is shown on stderr (with tqdm if installed: uv run --with tqdm ...).
 """
 import argparse
 import collections
@@ -25,8 +26,42 @@ import random
 import re
 import subprocess
 import sys
+import time
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".tga", ".psd", ".pdf"}
+
+
+def progress(iterable, desc: str, total=None, unit: str = "file"):
+    """Progress on stderr: tqdm when installed, otherwise a simple counter.
+
+    stdout stays clean, so `... > survey.txt` still shows the progress.
+    """
+    try:
+        from tqdm import tqdm
+    except ImportError:
+        tqdm = None
+    if tqdm:
+        yield from tqdm(iterable, desc=desc, total=total, unit=unit, file=sys.stderr,
+                        dynamic_ncols=True, mininterval=0.5)
+        return
+    start = last = time.monotonic()
+    n = 0
+
+    def show(end=""):
+        elapsed = time.monotonic() - start
+        of = f"/{total}" if total else ""
+        rate = n / elapsed if elapsed > 0 else 0
+        eta = f", ETA {int((total - n) / rate)}s" if total and rate else ""
+        print(f"\r{desc}: {n}{of} {unit}s ({int(elapsed)}s{eta})   ", end=end, file=sys.stderr, flush=True)
+
+    for item in iterable:
+        yield item
+        n += 1
+        now = time.monotonic()
+        if now - last >= 1:
+            last = now
+            show()
+    show("\n")
 
 
 def shape(name: str) -> str:
@@ -129,7 +164,7 @@ def survey(root: str, sample: int, patterns: bool, psd: bool) -> None:
     dir_shapes = collections.defaultdict(collections.Counter)
     others = collections.Counter()
 
-    for dirpath, dirnames, filenames in os.walk(root):
+    for dirpath, dirnames, filenames in progress(os.walk(root), "Scanning", unit="dir"):
         dirnames.sort()
         rel = os.path.relpath(dirpath, root)
         d = 0 if rel == "." else rel.count(os.sep) + 1
@@ -183,7 +218,7 @@ def survey(root: str, sample: int, patterns: bool, psd: bool) -> None:
         picked = paths if len(paths) <= sample else rng.sample(paths, sample)
         dims, kinds, comp, dpi = (collections.Counter() for _ in range(4))
         failed = 0
-        for p in picked:
+        for p in progress(picked, f"Reading {ext}", total=len(picked)):
             info = vipsheader(p)
             try:
                 w, h = int(info["width"]), int(info["height"])
@@ -224,7 +259,7 @@ def survey_psd(paths, sample, rng) -> None:
     n_layers, depth, kinds, modes, blend = (collections.Counter() for _ in range(5))
     coverage = collections.Counter()
     failed = 0
-    for p in picked:
+    for p in progress(picked, "Reading .psd", total=len(picked)):
         try:
             psd = PSDImage.open(p)
         except Exception:
