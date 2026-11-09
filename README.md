@@ -252,13 +252,22 @@ sudo systemctl reload caddy
 このディレクトリを削除してください。
 
 ```sh
-podman compose exec omeka sh -c 'rm -rf /var/www/html/files/iiif/*'
+podman exec omeka-s-app sh -c 'rm -rf /var/www/html/files/iiif/*'         # Quadlet
+podman compose exec omeka sh -c 'rm -rf /var/www/html/files/iiif/*'      # compose
 ```
 
 ## IIIF 画像の配信方式
 
 1. **画像サーバーなし（既定）**: IIIF Server が Omeka の画像（original / large）を
    そのままマニフェストに載せます。large の長辺は `OMEKA_THUMB_LARGE`（既定 1600px）。
+   IIIF Server は既定ではマニフェストに画像サービス（`/iiif/3/<メディアID>`）を載せますが、
+   画像サーバーがないとタイルの取得が 503 になり、ビューアに画像が表示されません。
+   そのため初回インストール時に、モジュール設定の「Default IIIF image api version」を
+   「No image server」にし、各バージョンの対応レベルを空にしています。
+   この自動設定を入れる前にインストールした環境では、管理画面の「モジュール」→
+   IIIF Server の設定 →「Image server」タブで同じように変え、マニフェストのキャッシュを削除してください。
+   Mirador は公開サイトのアイテムページに表示されます（サイトの「テーマ」→
+   リソースページの設定で、アイテムに Mirador ブロックを追加）。
 2. **静的タイル（IIIF Level 0）**: 手元で変換し、Caddy から静的に配信します。
    ```sh
    scripts/make-tiles.sh static https://omeka.example.org/iiif-img ./tiles image.tif

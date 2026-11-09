@@ -192,12 +192,39 @@ function moduleAction(string $action, string $id): void
         if ($action === 'install') {
             $manager->install($module);
             out("Installed module $id {$module->getIni('version')}.");
+            applyModuleDefaults($services, $id);
         } else {
             $manager->upgrade($module);
             out("Upgraded module $id to {$module->getIni('version')}.");
         }
     } catch (Throwable $e) {
         fail("Could not $action module $id: " . $e->getMessage());
+    }
+}
+
+/**
+ * Settings applied once, right after a module is first installed (later
+ * changes made in the admin UI are kept).
+ */
+function applyModuleDefaults($services, string $id): void
+{
+    $settings = $services->get('Omeka\Settings');
+    switch ($id) {
+        case 'IiifServer':
+            // By default IiifServer adds image services (/iiif/2|3/<media>)
+            // to manifests. Without an image server (ImageServer module) their
+            // info.json is served but image requests fail (503), so viewers
+            // show no image. Reference the image files instead; configure an
+            // external image server (e.g. IIPImage) in the module config when
+            // there is one. All of these are needed to drop the services from
+            // both v2 and v3 manifests.
+            $settings->set('iiifserver_media_api_default_version', '0');
+            $settings->set('iiifserver_media_api_default_supported_version', ['service' => '0', 'level' => '0']);
+            foreach (['1', '2', '3'] as $version) {
+                $settings->set('iiifserver_media_api_supported_version_' . $version, '');
+            }
+            out('IiifServer: image server disabled (images are served as files).');
+            break;
     }
 }
 
