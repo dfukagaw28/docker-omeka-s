@@ -11,6 +11,7 @@ Network=omeka.network
 PublishPort=127.0.0.1:${IIPSRV_PORT}:80
 Volume=${IIIF_IMAGE_DIR}:/data/images:ro,z
 Environment=MAX_IMAGE_CACHE_SIZE=${IIPSRV_CACHE_MB}
+Environment=IIPSRV_PROCS=${IIPSRV_PROCS}
 Environment=BASE_URL=${IIPSRV_BASE_URL}
 
 [Service]

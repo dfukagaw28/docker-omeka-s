@@ -179,6 +179,9 @@ cd ~/omeka-s && git pull && deploy/install-quadlet.sh
 
 DB のマイグレーションとモジュールのアップグレードは起動時に自動で実行されます。
 
+IIPImage のイメージ（`ghcr.io/dfukagaw28/iipsrv:<IIPSRV_VERSION>`）は、同じタグのまま作り直されることがあります
+（Debian の更新など）。新しいものにするときは、先に `podman pull ghcr.io/dfukagaw28/iipsrv:1.3` を実行します。
+
 ### 補足
 
 - ユニットは `~/.config/containers/systemd/` に生成されます（`--system` を付けると

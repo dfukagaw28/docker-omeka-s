@@ -60,6 +60,7 @@ services:
     restart: unless-stopped
     environment:
       MAX_IMAGE_CACHE_SIZE: ${IIPSRV_CACHE_MB:-10}
+      IIPSRV_PROCS: ${IIPSRV_PROCS:-1}
       # Public URL prefix used for "id" in info.json (empty: derived from Host)
       BASE_URL: ${IIPSRV_BASE_URL:-}
     ports:
